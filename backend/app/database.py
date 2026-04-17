@@ -11,14 +11,17 @@ from backend.app.sqlite_schema import SQLITE_SCHEMA
 
 
 def utc_now() -> str:
+    """Return the current UTC timestamp as ISO text. Takes no input and outputs a timezone-aware string for SQLite rows."""
     return datetime.now(UTC).isoformat()
 
 
 def _json(value: Any) -> str:
+    """Serialize a value for storage in SQLite text columns. Takes any JSON-compatible value and returns a JSON string."""
     return json.dumps(value, ensure_ascii=False)
 
 
 def _loads_list(value: str | None) -> list[Any]:
+    """Decode a JSON list from SQLite. Takes nullable JSON text and returns a list, falling back to an empty list."""
     if not value:
         return []
     loaded = json.loads(value)
@@ -26,6 +29,7 @@ def _loads_list(value: str | None) -> list[Any]:
 
 
 def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    """Convert a SQLite row into a plain dictionary. Takes a row or None and returns a dict or None."""
     if row is None:
         return None
     return dict(row)
@@ -33,10 +37,12 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
 
 class Database:
     def __init__(self, path: Path) -> None:
+        """Prepare a SQLite database handle. Input is the database path; output is an initialized Database instance."""
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def connect(self) -> sqlite3.Connection:
+        """Open a configured SQLite connection. Takes no direct input and returns a connection with row dictionaries, WAL, and foreign keys enabled."""
         conn = sqlite3.connect(self.path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
@@ -44,6 +50,7 @@ class Database:
         return conn
 
     def init(self) -> None:
+        """Create or migrate the local SQLite schema. Takes no input and returns nothing after ensuring required tables exist."""
         with self.connect() as conn:
             conn.executescript(SQLITE_SCHEMA)
 
@@ -55,6 +62,7 @@ class Database:
         whisper_model: str,
         force: bool,
     ) -> dict[str, Any]:
+        """Insert a queued ingestion job. Inputs are the source URL and ingestion options; output is the stored job dictionary."""
         now = utc_now()
         job_id = str(uuid.uuid4())
         with self.connect() as conn:
@@ -73,6 +81,7 @@ class Database:
         return job
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
+        """Load one ingestion job by id. Input is a job id; output is a normalized job dictionary or None."""
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
         job = _row_to_dict(row)
@@ -85,6 +94,7 @@ class Database:
         return job
 
     def recoverable_job_ids(self) -> list[str]:
+        """Find queued or interrupted jobs for worker recovery. Takes no input and returns job ids reset to queued order."""
         with self.connect() as conn:
             rows = conn.execute(
                 "SELECT id FROM jobs WHERE status IN ('queued', 'running') ORDER BY created_at"
@@ -100,6 +110,7 @@ class Database:
         return [row["id"] for row in rows]
 
     def update_job(self, job_id: str, **fields: Any) -> None:
+        """Update allowed job fields. Inputs are a job id and field values; output is no value after persisting changes."""
         allowed = {
             "status",
             "stage",
@@ -127,6 +138,7 @@ class Database:
             conn.execute(f"UPDATE jobs SET {', '.join(updates)} WHERE id = ?", values)
 
     def append_job_error(self, job_id: str, message: str) -> None:
+        """Append an error message to a job. Inputs are the job id and message; output is no value."""
         job = self.get_job(job_id)
         if job is None:
             return
@@ -135,6 +147,7 @@ class Database:
         self.update_job(job_id, errors=errors)
 
     def upsert_source(self, source: dict[str, Any]) -> None:
+        """Create or update a YouTube source row. Input is a source dictionary; output is no value after persistence."""
         now = utc_now()
         with self.connect() as conn:
             existing = conn.execute(
@@ -173,6 +186,7 @@ class Database:
             )
 
     def list_sources(self) -> list[dict[str, Any]]:
+        """List library sources newest first. Takes no input and returns source dictionaries."""
         with self.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM sources ORDER BY updated_at DESC"
@@ -180,11 +194,13 @@ class Database:
         return [dict(row) for row in rows]
 
     def get_source(self, source_id: str) -> dict[str, Any] | None:
+        """Load a source by id. Input is a source id; output is the source dictionary or None."""
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM sources WHERE id = ?", (source_id,)).fetchone()
         return _row_to_dict(row)
 
     def upsert_video(self, video: dict[str, Any]) -> None:
+        """Create or update a video row under a source. Input is a video dictionary; output is no value after persistence."""
         now = utc_now()
         with self.connect() as conn:
             existing = conn.execute(
@@ -241,6 +257,7 @@ class Database:
             )
 
     def update_video(self, video_id: str, **fields: Any) -> None:
+        """Update allowed video processing fields. Inputs are a video id and field values; output is no value."""
         allowed = {
             "audio_path",
             "transcript_json_path",
@@ -265,11 +282,13 @@ class Database:
             conn.execute(f"UPDATE videos SET {', '.join(updates)} WHERE id = ?", values)
 
     def get_video(self, video_id: str) -> dict[str, Any] | None:
+        """Load a video by id. Input is a video id; output is the video dictionary or None."""
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM videos WHERE id = ?", (video_id,)).fetchone()
         return _row_to_dict(row)
 
     def list_videos_for_source(self, source_id: str) -> list[dict[str, Any]]:
+        """List videos belonging to a source. Input is a source id; output is ordered video dictionaries."""
         with self.connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM videos WHERE source_id = ? ORDER BY created_at, title",
@@ -278,12 +297,14 @@ class Database:
         return [dict(row) for row in rows]
 
     def delete_source(self, source_id: str) -> None:
+        """Delete a source and its database-owned videos and chunks. Input is a source id; output is no value."""
         with self.connect() as conn:
             conn.execute("DELETE FROM chunks WHERE source_id = ?", (source_id,))
             conn.execute("DELETE FROM videos WHERE source_id = ?", (source_id,))
             conn.execute("DELETE FROM sources WHERE id = ?", (source_id,))
 
     def delete_chunks_for_video(self, video_id: str, embedding_model: str) -> None:
+        """Delete chunk rows for one video/model pair. Inputs are video id and embedding model; output is no value."""
         with self.connect() as conn:
             conn.execute(
                 "DELETE FROM chunks WHERE video_id = ? AND embedding_model = ?",
@@ -291,6 +312,7 @@ class Database:
             )
 
     def insert_chunks(self, chunks: list[dict[str, Any]]) -> None:
+        """Insert or replace transcript chunk metadata. Input is chunk dictionaries; output is no value after batch persistence."""
         now = utc_now()
         with self.connect() as conn:
             conn.executemany(
@@ -326,6 +348,7 @@ class Database:
             )
 
     def get_chunks_for_video(self, video_id: str, embedding_model: str) -> list[dict[str, Any]]:
+        """Load stored chunks for one video/model pair. Inputs are video id and embedding model; output is ordered chunk dictionaries."""
         with self.connect() as conn:
             rows = conn.execute(
                 """
@@ -344,6 +367,7 @@ class Database:
         model_provider: str,
         model_id: str,
     ) -> dict[str, Any]:
+        """Create a chat conversation. Inputs are title and model defaults; output is the stored conversation dictionary."""
         now = utc_now()
         conversation_id = str(uuid.uuid4())
         with self.connect() as conn:
@@ -361,6 +385,7 @@ class Database:
         return conversation
 
     def list_conversations(self) -> list[dict[str, Any]]:
+        """List conversations with last-message summary fields. Takes no input and returns newest-first conversation dictionaries."""
         with self.connect() as conn:
             rows = conn.execute(
                 """
@@ -383,6 +408,7 @@ class Database:
         return [dict(row) for row in rows]
 
     def get_conversation(self, conversation_id: str) -> dict[str, Any] | None:
+        """Load a conversation by id. Input is a conversation id; output is the row dictionary or None."""
         with self.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
@@ -397,6 +423,7 @@ class Database:
         model_provider: str | None = None,
         model_id: str | None = None,
     ) -> None:
+        """Update conversation metadata and timestamp. Inputs are a conversation id plus optional fields; output is no value."""
         updates = ["updated_at = ?"]
         values: list[Any] = [utc_now()]
         if title is not None:
@@ -416,6 +443,7 @@ class Database:
             )
 
     def delete_conversation(self, conversation_id: str) -> None:
+        """Delete a conversation and its SQLite-owned messages and context items. Input is a conversation id; output is no value."""
         with self.connect() as conn:
             conn.execute("DELETE FROM messages WHERE conversation_id = ?", (conversation_id,))
             conn.execute(
@@ -434,6 +462,7 @@ class Database:
         model_provider: str | None = None,
         model_id: str | None = None,
     ) -> dict[str, Any]:
+        """Create a chat message row. Inputs are conversation id, role, text, and optional citations/model data; output is the stored message."""
         now = utc_now()
         message_id = str(uuid.uuid4())
         with self.connect() as conn:
@@ -466,6 +495,7 @@ class Database:
         return message
 
     def get_message(self, message_id: str) -> dict[str, Any] | None:
+        """Load a message by id. Input is a message id; output is a normalized message dictionary or None."""
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
         message = _row_to_dict(row)
@@ -475,6 +505,7 @@ class Database:
         return message
 
     def list_messages(self, conversation_id: str) -> list[dict[str, Any]]:
+        """List messages in conversation order. Input is a conversation id; output is normalized message dictionaries."""
         with self.connect() as conn:
             rows = conn.execute(
                 """
@@ -503,6 +534,7 @@ class Database:
         status: str = "completed",
         error: str | None = None,
     ) -> dict[str, Any]:
+        """Create a context item attached to a conversation. Inputs describe the item and status; output is the stored context dictionary."""
         now = utc_now()
         item_id = str(uuid.uuid4())
         with self.connect() as conn:
@@ -536,6 +568,7 @@ class Database:
         return item
 
     def update_context_item(self, item_id: str, **fields: Any) -> None:
+        """Update allowed context item fields. Inputs are an item id and field values; output is no value."""
         allowed = {"title", "url", "text", "source_id", "video_id", "playlist_id", "status", "error"}
         updates: list[str] = []
         values: list[Any] = []
@@ -554,6 +587,7 @@ class Database:
             )
 
     def get_context_item(self, item_id: str) -> dict[str, Any] | None:
+        """Load a context item by id. Input is an item id; output is the context dictionary or None."""
         with self.connect() as conn:
             row = conn.execute(
                 "SELECT * FROM conversation_context_items WHERE id = ?", (item_id,)
@@ -561,6 +595,7 @@ class Database:
         return _row_to_dict(row)
 
     def list_context_items(self, conversation_id: str) -> list[dict[str, Any]]:
+        """List context items for a conversation. Input is a conversation id; output is ordered context dictionaries."""
         with self.connect() as conn:
             rows = conn.execute(
                 """
@@ -573,5 +608,6 @@ class Database:
         return [dict(row) for row in rows]
 
     def delete_context_item(self, item_id: str) -> None:
+        """Delete one context item row. Input is an item id; output is no value."""
         with self.connect() as conn:
             conn.execute("DELETE FROM conversation_context_items WHERE id = ?", (item_id,))

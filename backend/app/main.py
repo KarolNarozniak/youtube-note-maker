@@ -11,6 +11,7 @@ from backend.app.worker import IngestionWorker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage backend startup and shutdown resources. Input is the FastAPI app; output is a lifespan context that starts/stops the worker."""
     db.init()
     worker = IngestionWorker(create_ingestion_pipeline())
     app.state.worker = worker

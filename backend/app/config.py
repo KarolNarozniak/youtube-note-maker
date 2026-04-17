@@ -6,10 +6,12 @@ from pathlib import Path
 
 
 def _repo_root() -> Path:
+    """Return the repository root path. Takes no input and returns the parent directory that owns backend and frontend."""
     return Path(__file__).resolve().parents[2]
 
 
 def load_env_file(path: Path | None = None) -> None:
+    """Load key/value pairs from a .env file into the process environment. Accepts an optional path and mutates os.environ without returning a value."""
     env_path = path or _repo_root() / ".env"
     if not env_path.exists():
         return
@@ -25,10 +27,12 @@ def load_env_file(path: Path | None = None) -> None:
 
 
 def _env(name: str, default: str) -> str:
+    """Read a string environment variable with a fallback. Inputs are the variable name and default; output is the resolved string."""
     return os.environ.get(name, default)
 
 
 def _env_int(name: str, default: int) -> int:
+    """Read an integer environment variable with a fallback. Inputs are the variable name and default; output is a parsed integer or the fallback."""
     try:
         return int(os.environ.get(name, str(default)))
     except ValueError:
@@ -58,6 +62,7 @@ class Settings:
     chunk_overlap_tokens: int
 
     def ensure_dirs(self) -> None:
+        """Create local storage directories required by the app. Takes settings paths as implicit input and returns nothing."""
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.transcript_dir.mkdir(parents=True, exist_ok=True)
@@ -65,6 +70,7 @@ class Settings:
 
 
 def get_settings() -> Settings:
+    """Build runtime settings from .env and process environment. Takes no direct input and returns a Settings object with resolved paths and service URLs."""
     load_env_file()
     root = _repo_root()
     data_dir = Path(_env("DATA_DIR", "data"))

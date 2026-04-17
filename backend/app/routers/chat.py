@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api", tags=["chat"])
 
 @router.get("/chat/models", response_model=ChatModelsResponse)
 async def list_chat_models() -> ChatModelsResponse:
+    """List local and online chat model options. Takes no input and outputs model metadata with Ollama availability when known."""
     try:
         installed = await OllamaChatClient(base_url=settings.ollama_url).list_models()
     except Exception:
@@ -52,6 +53,7 @@ async def list_chat_models() -> ChatModelsResponse:
     status_code=status.HTTP_201_CREATED,
 )
 async def create_conversation(request: ConversationCreateRequest) -> ConversationDetail:
+    """Create a new chat conversation. Input is title/provider/model data; output is the full conversation detail."""
     conversation = db.create_conversation(
         title=request.title or "New conversation",
         model_provider=request.model_provider,
@@ -65,11 +67,13 @@ async def create_conversation(request: ConversationCreateRequest) -> Conversatio
 
 @router.get("/conversations", response_model=list[ConversationSummary])
 async def list_conversations() -> list[ConversationSummary]:
+    """List chat conversations. Takes no input and outputs summaries with message counts."""
     return [ConversationSummary(**conversation) for conversation in db.list_conversations()]
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
 async def get_conversation(conversation_id: str) -> ConversationDetail:
+    """Return one conversation with messages and context. Input is a conversation id; output is detail data or a 404 error."""
     detail = build_conversation_detail(conversation_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -78,6 +82,7 @@ async def get_conversation(conversation_id: str) -> ConversationDetail:
 
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_conversation(conversation_id: str) -> None:
+    """Delete a conversation and its chat-scoped vectors. Input is a conversation id; output is no response body."""
     conversation = db.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -97,6 +102,7 @@ async def add_conversation_context(
     conversation_id: str,
     request: ConversationContextCreateRequest,
 ) -> ConversationContextItem:
+    """Attach context to a conversation. Inputs are the conversation id and context payload; output is the stored context item."""
     conversation = db.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -115,6 +121,7 @@ async def add_conversation_context(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_conversation_context(conversation_id: str, item_id: str) -> None:
+    """Remove one context item from a conversation. Inputs are conversation and context ids; output is no response body."""
     conversation = db.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -137,6 +144,7 @@ async def send_conversation_message(
     conversation_id: str,
     request: ChatSendRequest,
 ) -> ChatSendResponse:
+    """Send a user message through RAG and the selected model. Inputs are conversation id and message/model data; output is saved messages and citations."""
     conversation = db.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")

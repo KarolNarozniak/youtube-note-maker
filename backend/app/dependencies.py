@@ -17,6 +17,7 @@ db = Database(settings.db_path)
 
 
 def create_embedder() -> OllamaEmbeddingClient:
+    """Create the Ollama embedding client. Takes settings as implicit input and returns a configured client."""
     return OllamaEmbeddingClient(
         base_url=settings.ollama_url,
         model=settings.ollama_embed_model,
@@ -24,6 +25,7 @@ def create_embedder() -> OllamaEmbeddingClient:
 
 
 def create_vector_store() -> QdrantVectorStore:
+    """Create the Qdrant vector store client. Takes settings as implicit input and returns a configured store wrapper."""
     return QdrantVectorStore(
         base_url=settings.qdrant_url,
         collection=settings.qdrant_collection,
@@ -31,6 +33,7 @@ def create_vector_store() -> QdrantVectorStore:
 
 
 def create_ingestion_pipeline() -> IngestionPipeline:
+    """Assemble the ingestion pipeline services. Takes shared settings/database as implicit input and returns a ready pipeline."""
     return IngestionPipeline(
         settings=settings,
         db=db,
@@ -42,6 +45,7 @@ def create_ingestion_pipeline() -> IngestionPipeline:
 
 
 def create_chat_service() -> ChatService:
+    """Assemble the chat orchestration service. Takes shared settings/database as implicit input and returns a ready ChatService."""
     return ChatService(
         settings=settings,
         db=db,
@@ -51,6 +55,7 @@ def create_chat_service() -> ChatService:
 
 
 def build_conversation_detail(conversation_id: str) -> ConversationDetail | None:
+    """Build a full conversation API model. Input is a conversation id; output is detail data with messages/context or None."""
     conversation = db.get_conversation(conversation_id)
     if conversation is None:
         return None

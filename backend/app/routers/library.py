@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api", tags=["library"])
 
 @router.get("/health")
 async def health() -> dict[str, str]:
+    """Return backend health status. Takes no input and outputs a simple status dictionary."""
     return {"status": "ok"}
 
 
@@ -37,6 +38,7 @@ async def create_ingestion(
     ingestion: IngestionRequest,
     request: Request,
 ) -> IngestionResponse:
+    """Create and enqueue an ingestion job. Inputs are the request body and FastAPI app state; output is the accepted job id/status."""
     job = db.create_job(
         url=ingestion.url,
         language=ingestion.language,
@@ -49,6 +51,7 @@ async def create_ingestion(
 
 @router.get("/jobs/{job_id}", response_model=JobResponse)
 async def get_job(job_id: str) -> JobResponse:
+    """Return one ingestion job. Input is a job id path parameter; output is job status data or a 404 error."""
     job = db.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -57,11 +60,13 @@ async def get_job(job_id: str) -> JobResponse:
 
 @router.get("/sources", response_model=list[SourceSummary])
 async def list_sources() -> list[SourceSummary]:
+    """List ingested library sources. Takes no input and outputs source summaries."""
     return [SourceSummary(**source) for source in db.list_sources()]
 
 
 @router.get("/sources/{source_id}", response_model=SourceDetail)
 async def get_source(source_id: str) -> SourceDetail:
+    """Return one source with its videos. Input is a source id; output is source detail or a 404 error."""
     source = db.get_source(source_id)
     if source is None:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -71,6 +76,7 @@ async def get_source(source_id: str) -> SourceDetail:
 
 @router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_source(source_id: str) -> None:
+    """Delete a source from SQLite, Qdrant, and local artifacts. Input is a source id; output is no response body."""
     source = db.get_source(source_id)
     if source is None:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -87,6 +93,7 @@ async def delete_source(source_id: str) -> None:
 
 @router.get("/videos/{video_id}/transcript", response_model=TranscriptResponse)
 async def get_transcript(video_id: str) -> TranscriptResponse:
+    """Return the full transcript for one video. Input is a video id; output is transcript text and timestamped segments."""
     video = db.get_video(video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -106,6 +113,7 @@ async def get_transcript(video_id: str) -> TranscriptResponse:
 
 @router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest) -> SearchResponse:
+    """Run semantic search against Qdrant. Input is a query plus optional filters; output is ranked chunks and a formatted context block."""
     try:
         vector = (await create_embedder().embed_texts([request.query]))[0]
         raw_results = await create_vector_store().search(
