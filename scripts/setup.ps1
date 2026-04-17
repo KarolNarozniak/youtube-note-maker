@@ -26,6 +26,7 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     throw "npm was not found. Install Node.js first."
 }
 cmd /c npm ci --prefix frontend
+cmd /c npm ci --prefix docs-site
 
 if (Get-Command ollama -ErrorAction SilentlyContinue) {
     ollama pull embeddinggemma

@@ -1,5 +1,6 @@
 from backend.app.services.chat import (
     build_chat_context,
+    build_current_question,
     build_model_messages,
     citation_from_qdrant,
     filters_for_context_item,
@@ -50,9 +51,20 @@ def test_build_model_messages_includes_context_and_history() -> None:
     )
 
     assert messages[0]["role"] == "system"
-    assert "Retrieved context" in messages[1]["content"]
-    assert messages[-1] == {"role": "user", "content": "Question?"}
+    assert "Retrieved context" in messages[-1]["content"]
+    assert "Question?\n\nAnswer from the retrieved context first" in messages[-1]["content"]
     assert "[1] Doc" in build_chat_context(citations)
+
+
+def test_build_current_question_keeps_context_with_question() -> None:
+    content = build_current_question(
+        user_text="Which antenna is best?",
+        context="[1] Wireless\nOmnidirectional antennas cover all sides.",
+    )
+
+    assert "<context>" in content
+    assert "Omnidirectional antennas cover all sides." in content
+    assert "Question:\nWhich antenna is best?" in content
 
 
 def test_make_title_is_short() -> None:

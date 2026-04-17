@@ -286,13 +286,13 @@ def build_model_messages(
 ) -> list[dict[str, str]]:
     context = build_chat_context(citations)
     system = (
-        "You are Context Studio, a concise research assistant. "
-        "Answer using the provided context first. Cite sources as [1], [2], etc. "
-        "If the context is insufficient, say what is missing and then answer cautiously."
+        "You are Thothscribe, a concise research assistant. "
+        "Use the retrieved context attached to the current question as your primary evidence. "
+        "When the context supports an answer, answer directly and cite the supporting snippets as [1], [2], etc. "
+        "Say the context is insufficient only when none of the snippets contain evidence for the answer. "
+        "Use outside knowledge only after clearly stating that the retrieved context does not answer the question."
     )
     messages = [{"role": "system", "content": system}]
-    if context:
-        messages.append({"role": "user", "content": f"Retrieved context:\n{context}"})
 
     history_budget = 8_000
     kept: list[dict[str, str]] = []
@@ -304,7 +304,7 @@ def build_model_messages(
             break
         kept.append({"role": message["role"], "content": content})
     messages.extend(reversed(kept))
-    messages.append({"role": "user", "content": user_text})
+    messages.append({"role": "user", "content": build_current_question(user_text, context)})
     return messages
 
 
@@ -314,6 +314,20 @@ def build_chat_context(citations: list[dict[str, Any]]) -> str:
         source = citation.get("url") or citation.get("title")
         blocks.append(f"[{citation['index']}] {citation['title']}\nSource: {source}\n{citation['text']}")
     return "\n\n".join(blocks)
+
+
+def build_current_question(user_text: str, context: str) -> str:
+    if not context:
+        return user_text
+    return (
+        "Retrieved context for this question:\n"
+        "<context>\n"
+        f"{context}\n"
+        "</context>\n\n"
+        "Question:\n"
+        f"{user_text}\n\n"
+        "Answer from the retrieved context first. Cite the snippets that support the answer."
+    )
 
 
 def make_title(text: str) -> str:

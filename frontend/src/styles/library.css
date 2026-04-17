@@ -1,0 +1,145 @@
+.library-layout,
+.job-card {
+  display: grid;
+  gap: 12px;
+}
+
+.ingest-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(220px, 1fr) 130px max-content max-content;
+}
+
+.check-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-height: 42px;
+  padding-top: 25px;
+}
+
+.check-row input {
+  min-height: auto;
+  width: auto;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 0.8fr 1.2fr;
+}
+
+.detail-actions {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.search-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr max-content;
+}
+
+.context-box {
+  margin-top: 14px;
+}
+
+.workspace {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 320px minmax(0, 1fr);
+}
+
+.source-list {
+  align-self: start;
+}
+
+.source-card {
+  align-items: start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+  min-height: 74px;
+  padding: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.source-card.selected {
+  border-color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.video-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.video-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  min-height: 126px;
+  padding: 10px;
+}
+
+.video-card img {
+  aspect-ratio: 16 / 9;
+  background: var(--surface-strong);
+  border-radius: 6px;
+  object-fit: cover;
+  width: 112px;
+}
+
+.segments {
+  display: grid;
+  gap: 8px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.segments p {
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 56px minmax(0, 1fr);
+  line-height: 1.55;
+  margin: 0;
+  padding-bottom: 8px;
+}
+
+.segments span {
+  color: var(--accent);
+  font-weight: 900;
+}
+
+@media (max-width: 920px) {
+  .ingest-form,
+  .grid,
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .check-row {
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .detail-actions,
+  .search-form,
+  .video-card {
+    grid-template-columns: 1fr;
+  }
+
+  .video-card img {
+    width: 100%;
+  }
+}
