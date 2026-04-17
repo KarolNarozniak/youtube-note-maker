@@ -9,6 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.app.config import get_settings
 from backend.app.database import Database
 from backend.app.schemas import (
+    ChatModelsResponse,
+    ChatModelInfo,
+    ChatSendRequest,
+    ChatSendResponse,
+    ConversationContextCreateRequest,
+    ConversationContextItem,
+    ConversationCreateRequest,
+    ConversationDetail,
+    ConversationSummary,
     IngestionRequest,
     IngestionResponse,
     JobResponse,
@@ -19,6 +28,8 @@ from backend.app.schemas import (
     TranscriptResponse,
 )
 from backend.app.services.artifacts import load_transcript_artifact
+from backend.app.services.chat import ChatService, LOCAL_MODEL_PRESETS, OPENAI_MODEL_PRESETS
+from backend.app.services.chat_clients import OllamaChatClient
 from backend.app.services.deletion import delete_source_artifacts
 from backend.app.services.downloader import DownloaderClient
 from backend.app.services.embeddings import OllamaEmbeddingClient
@@ -175,4 +186,165 @@ async def search(request: SearchRequest) -> SearchResponse:
         query=request.query,
         results=results,
         context=build_context(results),
+    )
+
+
+@app.get("/api/chat/models", response_model=ChatModelsResponse)
+async def list_chat_models() -> ChatModelsResponse:
+    try:
+        installed = await OllamaChatClient(base_url=settings.ollama_url).list_models()
+    except Exception:
+        installed = []
+
+    local_ids = list(dict.fromkeys(LOCAL_MODEL_PRESETS + installed))
+    return ChatModelsResponse(
+        local=[
+            ChatModelInfo(
+                provider="ollama",
+                id=model_id,
+                label=model_id,
+                available=(not installed) or model_id in installed,
+            )
+            for model_id in local_ids
+        ],
+        online=[
+            ChatModelInfo(provider="openai", id=model_id, label=model_id, available=True)
+            for model_id in OPENAI_MODEL_PRESETS
+        ],
+    )
+
+
+@app.post(
+    "/api/conversations",
+    response_model=ConversationDetail,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_conversation(request: ConversationCreateRequest) -> ConversationDetail:
+    conversation = db.create_conversation(
+        title=request.title or "New conversation",
+        model_provider=request.model_provider,
+        model_id=request.model_id,
+    )
+    return _conversation_detail(conversation["id"])
+
+
+@app.get("/api/conversations", response_model=list[ConversationSummary])
+async def list_conversations() -> list[ConversationSummary]:
+    return [ConversationSummary(**conversation) for conversation in db.list_conversations()]
+
+
+@app.get("/api/conversations/{conversation_id}", response_model=ConversationDetail)
+async def get_conversation(conversation_id: str) -> ConversationDetail:
+    conversation = db.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return _conversation_detail(conversation_id)
+
+
+@app.delete("/api/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(conversation_id: str) -> None:
+    conversation = db.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    service = _chat_service()
+    try:
+        await service.delete_conversation(conversation_id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return None
+
+
+@app.post(
+    "/api/conversations/{conversation_id}/context",
+    response_model=ConversationContextItem,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_conversation_context(
+    conversation_id: str,
+    request: ConversationContextCreateRequest,
+) -> ConversationContextItem:
+    conversation = db.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    try:
+        item = await _chat_service().add_context(conversation_id, request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return ConversationContextItem(**item)
+
+
+@app.delete(
+    "/api/conversations/{conversation_id}/context/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_conversation_context(conversation_id: str, item_id: str) -> None:
+    conversation = db.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    item = db.get_context_item(item_id)
+    if item is None or item["conversation_id"] != conversation_id:
+        raise HTTPException(status_code=404, detail="Context item not found")
+    try:
+        await _chat_service().delete_context_item(item)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return None
+
+
+@app.post(
+    "/api/conversations/{conversation_id}/messages",
+    response_model=ChatSendResponse,
+)
+async def send_conversation_message(
+    conversation_id: str,
+    request: ChatSendRequest,
+) -> ChatSendResponse:
+    conversation = db.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    try:
+        user_message, assistant_message, citations = await _chat_service().send_message(
+            conversation=conversation,
+            text=request.text,
+            model_provider=request.model_provider,
+            model_id=request.model_id,
+            api_key=request.api_key,
+            top_k=request.top_k,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return ChatSendResponse(
+        user_message=user_message,
+        assistant_message=assistant_message,
+        citations=citations,
+    )
+
+
+def _chat_service() -> ChatService:
+    return ChatService(
+        settings=settings,
+        db=db,
+        embedder=OllamaEmbeddingClient(
+            base_url=settings.ollama_url,
+            model=settings.ollama_embed_model,
+        ),
+        vector_store=QdrantVectorStore(
+            base_url=settings.qdrant_url,
+            collection=settings.qdrant_collection,
+        ),
+    )
+
+
+def _conversation_detail(conversation_id: str) -> ConversationDetail:
+    conversation = db.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return ConversationDetail(
+        **conversation,
+        messages=db.list_messages(conversation_id),
+        context_items=db.list_context_items(conversation_id),
     )

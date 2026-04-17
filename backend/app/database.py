@@ -114,9 +114,47 @@ class Database:
                     UNIQUE(video_id, chunk_index, embedding_model)
                 );
 
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    model_provider TEXT NOT NULL,
+                    model_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS messages (
+                    id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL,
+                    role TEXT NOT NULL,
+                    text TEXT NOT NULL,
+                    citations TEXT NOT NULL DEFAULT '[]',
+                    model_provider TEXT,
+                    model_id TEXT,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS conversation_context_items (
+                    id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    text TEXT,
+                    source_id TEXT,
+                    video_id TEXT,
+                    playlist_id TEXT,
+                    status TEXT NOT NULL,
+                    error TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_videos_source ON videos(source_id);
                 CREATE INDEX IF NOT EXISTS idx_chunks_video ON chunks(video_id);
                 CREATE INDEX IF NOT EXISTS idx_chunks_source ON chunks(source_id);
+                CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
+                CREATE INDEX IF NOT EXISTS idx_context_conversation ON conversation_context_items(conversation_id);
                 """
             )
 
@@ -409,3 +447,242 @@ class Database:
                 (video_id, embedding_model),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def create_conversation(
+        self,
+        *,
+        title: str,
+        model_provider: str,
+        model_id: str,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        conversation_id = str(uuid.uuid4())
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO conversations (
+                    id, title, model_provider, model_id, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (conversation_id, title, model_provider, model_id, now, now),
+            )
+        conversation = self.get_conversation(conversation_id)
+        assert conversation is not None
+        return conversation
+
+    def list_conversations(self) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    c.*,
+                    (
+                        SELECT text FROM messages
+                        WHERE conversation_id = c.id
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    ) AS last_message,
+                    (
+                        SELECT COUNT(*) FROM messages
+                        WHERE conversation_id = c.id
+                    ) AS message_count
+                FROM conversations c
+                ORDER BY c.updated_at DESC
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_conversation(self, conversation_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conversation_id,)
+            ).fetchone()
+        return _row_to_dict(row)
+
+    def touch_conversation(
+        self,
+        conversation_id: str,
+        *,
+        title: str | None = None,
+        model_provider: str | None = None,
+        model_id: str | None = None,
+    ) -> None:
+        updates = ["updated_at = ?"]
+        values: list[Any] = [utc_now()]
+        if title is not None:
+            updates.append("title = ?")
+            values.append(title)
+        if model_provider is not None:
+            updates.append("model_provider = ?")
+            values.append(model_provider)
+        if model_id is not None:
+            updates.append("model_id = ?")
+            values.append(model_id)
+        values.append(conversation_id)
+        with self.connect() as conn:
+            conn.execute(
+                f"UPDATE conversations SET {', '.join(updates)} WHERE id = ?",
+                values,
+            )
+
+    def delete_conversation(self, conversation_id: str) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM messages WHERE conversation_id = ?", (conversation_id,))
+            conn.execute(
+                "DELETE FROM conversation_context_items WHERE conversation_id = ?",
+                (conversation_id,),
+            )
+            conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+
+    def create_message(
+        self,
+        *,
+        conversation_id: str,
+        role: str,
+        text: str,
+        citations: list[dict[str, Any]] | None = None,
+        model_provider: str | None = None,
+        model_id: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        message_id = str(uuid.uuid4())
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO messages (
+                    id, conversation_id, role, text, citations,
+                    model_provider, model_id, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    message_id,
+                    conversation_id,
+                    role,
+                    text,
+                    _json(citations or []),
+                    model_provider,
+                    model_id,
+                    now,
+                ),
+            )
+        self.touch_conversation(
+            conversation_id,
+            model_provider=model_provider,
+            model_id=model_id,
+        )
+        message = self.get_message(message_id)
+        assert message is not None
+        return message
+
+    def get_message(self, message_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM messages WHERE id = ?", (message_id,)).fetchone()
+        message = _row_to_dict(row)
+        if message is None:
+            return None
+        message["citations"] = _loads_list(message["citations"])
+        return message
+
+    def list_messages(self, conversation_id: str) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM messages
+                WHERE conversation_id = ?
+                ORDER BY created_at
+                """,
+                (conversation_id,),
+            ).fetchall()
+        messages = [dict(row) for row in rows]
+        for message in messages:
+            message["citations"] = _loads_list(message["citations"])
+        return messages
+
+    def create_context_item(
+        self,
+        *,
+        conversation_id: str,
+        item_type: str,
+        title: str,
+        url: str | None = None,
+        text: str | None = None,
+        source_id: str | None = None,
+        video_id: str | None = None,
+        playlist_id: str | None = None,
+        status: str = "completed",
+        error: str | None = None,
+    ) -> dict[str, Any]:
+        now = utc_now()
+        item_id = str(uuid.uuid4())
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO conversation_context_items (
+                    id, conversation_id, type, title, url, text, source_id,
+                    video_id, playlist_id, status, error, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item_id,
+                    conversation_id,
+                    item_type,
+                    title,
+                    url,
+                    text,
+                    source_id,
+                    video_id,
+                    playlist_id,
+                    status,
+                    error,
+                    now,
+                    now,
+                ),
+            )
+        self.touch_conversation(conversation_id)
+        item = self.get_context_item(item_id)
+        assert item is not None
+        return item
+
+    def update_context_item(self, item_id: str, **fields: Any) -> None:
+        allowed = {"title", "url", "text", "source_id", "video_id", "playlist_id", "status", "error"}
+        updates: list[str] = []
+        values: list[Any] = []
+        for key, value in fields.items():
+            if key not in allowed:
+                raise ValueError(f"Unsupported context item field: {key}")
+            updates.append(f"{key} = ?")
+            values.append(value)
+        updates.append("updated_at = ?")
+        values.append(utc_now())
+        values.append(item_id)
+        with self.connect() as conn:
+            conn.execute(
+                f"UPDATE conversation_context_items SET {', '.join(updates)} WHERE id = ?",
+                values,
+            )
+
+    def get_context_item(self, item_id: str) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM conversation_context_items WHERE id = ?", (item_id,)
+            ).fetchone()
+        return _row_to_dict(row)
+
+    def list_context_items(self, conversation_id: str) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM conversation_context_items
+                WHERE conversation_id = ?
+                ORDER BY created_at
+                """,
+                (conversation_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_context_item(self, item_id: str) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM conversation_context_items WHERE id = ?", (item_id,))

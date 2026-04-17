@@ -290,6 +290,7 @@ class IngestionPipeline:
         for chunk, vector in zip(chunks, embeddings, strict=True):
             point_id = stable_point_id(video_id, chunk.chunk_index, self.embedder.model)
             payload = {
+                "scope": "library",
                 "source_id": source_id,
                 "video_id": video_id,
                 "playlist_id": video.playlist_id,

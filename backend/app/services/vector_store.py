@@ -81,7 +81,17 @@ class QdrantVectorStore:
 
 
 def build_filter(filters: dict[str, Any]) -> dict[str, Any] | None:
-    allowed = {"source_id", "video_id", "playlist_id", "language", "embedding_model"}
+    allowed = {
+        "source_id",
+        "video_id",
+        "playlist_id",
+        "language",
+        "embedding_model",
+        "scope",
+        "conversation_id",
+        "context_item_id",
+        "context_type",
+    }
     must = []
     for key, value in filters.items():
         if key not in allowed or value in (None, ""):
