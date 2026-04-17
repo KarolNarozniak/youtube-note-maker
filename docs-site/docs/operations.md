@@ -40,4 +40,6 @@ If the downloader cannot start, rebuild the sidecar:
 dotnet build downloader\YoutubeNoteDownloader\YoutubeNoteDownloader.csproj
 ```
 
+Setup now also publishes the downloader to `.local/downloader` and writes `DOWNLOADER_BIN` into `.env`. If Windows Application Control blocks the generated DLL or executable, add `.local/downloader` to your trusted/excluded path if your policy allows it; strict WDAC/App Control policies may require changing the policy rather than a Defender exclusion.
+
 If Whisper is slow, use a smaller model through the ingestion request or set `WHISPER_MODEL` in `.env`.

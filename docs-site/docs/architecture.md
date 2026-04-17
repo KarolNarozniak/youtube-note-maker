@@ -27,7 +27,7 @@ data/
 
 ## Backend
 
-The backend binds to `127.0.0.1:8000`. `backend/app/main.py` now only creates the FastAPI app, starts the ingestion worker, and mounts focused routers:
+The backend binds to `127.0.0.1:2002` by default. `backend/app/main.py` only creates the FastAPI app, starts the ingestion worker, and mounts focused routers:
 
 - `backend/app/routers/library.py` handles ingestion, sources, transcripts, deletion, and search.
 - `backend/app/routers/chat.py` handles model discovery, conversations, context items, and chat messages.
@@ -35,7 +35,7 @@ The backend binds to `127.0.0.1:8000`. `backend/app/main.py` now only creates th
 
 ## Frontend
 
-The frontend is a React/Vite app at `127.0.0.1:5173`.
+The frontend is a React/Vite app at `127.0.0.1:2001`.
 
 - `frontend/src/App.tsx` owns the top-level tabs, branding, and theme toggle.
 - `frontend/src/views/LibraryView.tsx` contains the ingestion and source browsing workspace.

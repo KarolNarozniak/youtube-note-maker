@@ -44,6 +44,10 @@ class Settings:
     repo_root: Path
     host: str
     port: int
+    frontend_host: str
+    frontend_port: int
+    docs_host: str
+    docs_port: int
     data_dir: Path
     db_path: Path
     audio_dir: Path
@@ -80,13 +84,17 @@ def get_settings() -> Settings:
     return Settings(
         repo_root=root,
         host=_env("APP_HOST", "127.0.0.1"),
-        port=_env_int("APP_PORT", 8000),
+        port=_env_int("APP_PORT", 2002),
+        frontend_host=_env("FRONTEND_HOST", "127.0.0.1"),
+        frontend_port=_env_int("FRONTEND_PORT", 2001),
+        docs_host=_env("DOCS_HOST", "127.0.0.1"),
+        docs_port=_env_int("DOCS_PORT", 2003),
         data_dir=data_dir,
         db_path=data_dir / "app.db",
         audio_dir=data_dir / "audio",
         transcript_dir=data_dir / "transcripts",
         chunks_dir=data_dir / "chunks",
-        qdrant_url=_env("QDRANT_URL", "http://localhost:6333").rstrip("/"),
+        qdrant_url=_env("QDRANT_URL", "http://localhost:2004").rstrip("/"),
         qdrant_collection=_env("QDRANT_COLLECTION", "youtube_notes_v1"),
         ollama_url=_env("OLLAMA_URL", "http://localhost:11434").rstrip("/"),
         ollama_embed_model=_env("OLLAMA_EMBED_MODEL", "embeddinggemma"),

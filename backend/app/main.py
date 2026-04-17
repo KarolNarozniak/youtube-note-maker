@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.constants import APP_NAME
-from backend.app.dependencies import create_ingestion_pipeline, db
+from backend.app.dependencies import create_ingestion_pipeline, db, settings
 from backend.app.routers import chat, library
 from backend.app.worker import IngestionWorker
 
@@ -23,9 +23,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=APP_NAME, version="0.1.0", lifespan=lifespan)
+frontend_origins = {
+    f"http://{settings.frontend_host}:{settings.frontend_port}",
+    f"http://localhost:{settings.frontend_port}",
+}
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+    allow_origins=sorted(frontend_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import shlex
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -139,9 +138,10 @@ class DownloaderClient:
             raise RuntimeError(f"Downloader returned invalid JSON: {stdout_text[:500]}") from exc
 
     def _command_prefix(self) -> list[str]:
+        """Resolve the downloader executable command. Reads DOWNLOADER_BIN when configured and returns the process prefix argv."""
         configured = os.environ.get("DOWNLOADER_BIN")
         if configured:
-            return shlex.split(configured)
+            return [configured.strip().strip('"').strip("'")]
         dotnet = _find_dotnet()
         if self.settings.downloader_dll.exists():
             return [dotnet, str(self.settings.downloader_dll)]

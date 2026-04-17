@@ -8,9 +8,10 @@ Thothscribe is a local YouTube-to-RAG workspace. Paste a YouTube video or playli
 
 ## What This Builds
 
-- FastAPI backend on `127.0.0.1:8000`
-- React/Vite app on `127.0.0.1:5173`
-- Docusaurus documentation on `127.0.0.1:3000`
+- React/Vite app on `127.0.0.1:2001`
+- FastAPI backend on `127.0.0.1:2002`
+- Docusaurus documentation on `127.0.0.1:2003`
+- Qdrant REST on `127.0.0.1:2004`
 - .NET downloader sidecar using `YoutubeExplode`
 - SQLite metadata and chat history in `data/app.db`
 - Transcript and chunk artifacts under `data/`
@@ -29,14 +30,25 @@ Audio is deleted after successful transcription, chunking, and embedding. Transc
 - FFmpeg
 - NVIDIA GPU optional, but recommended for Whisper
 
-## Setup
+## Setup On Windows
 
 ```powershell
 Copy-Item .env.example .env
 .\scripts\setup.ps1
 ```
 
-## Run
+## Setup On Ubuntu
+
+```bash
+git clone https://github.com/KarolNarozniak/youtube-note-maker.git
+cd youtube-note-maker
+bash scripts/install-prereqs-ubuntu.sh
+# If the script says it added you to the docker group, open a new terminal or run:
+newgrp docker
+bash scripts/setup.sh
+```
+
+## Run On Windows
 
 Open separate terminals:
 
@@ -47,11 +59,23 @@ Open separate terminals:
 .\scripts\start-docs.ps1
 ```
 
+Or start the app stack quickly:
+
+```powershell
+.\scripts\start-all.ps1
+```
+
+## Run On Ubuntu
+
+```bash
+bash scripts/start-all.sh
+```
+
 Open:
 
 ```text
-http://127.0.0.1:5173
-http://127.0.0.1:3000
+http://127.0.0.1:2001
+http://127.0.0.1:2003
 ```
 
 ## API

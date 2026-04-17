@@ -14,6 +14,15 @@ cmd /c npm run build --prefix docs-site
 dotnet build downloader\YoutubeNoteDownloader\YoutubeNoteDownloader.csproj
 ```
 
+Ubuntu equivalents:
+
+```bash
+.venv/bin/python -m pytest backend/tests
+npm run build --prefix frontend
+npm run build --prefix docs-site
+dotnet build downloader/YoutubeNoteDownloader/YoutubeNoteDownloader.csproj
+```
+
 ## Code Organization
 
 Backend route handlers are grouped by product area. Shared service construction lives in `backend/app/dependencies.py`, while durable data access stays in `backend/app/database.py`.
