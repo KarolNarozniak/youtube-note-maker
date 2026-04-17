@@ -60,6 +60,23 @@ On Ubuntu:
 bash scripts/start-all.sh
 ```
 
+## Share On Your Local Network
+
+On an Ubuntu VM, expose the app at the VM's private-network IP through Nginx:
+
+```bash
+bash scripts/start-all.sh
+sudo bash scripts/expose-lan-ubuntu.sh 10.7.183.67
+```
+
+The script installs Nginx if needed, writes a `thothscribe` site, proxies `/api` to the FastAPI backend, proxies everything else to the frontend, and adds `http://10.7.183.67` to `ALLOWED_ORIGINS` in `.env`.
+
+Open:
+
+```text
+http://10.7.183.67/
+```
+
 Use these local URLs:
 
 - App: `http://127.0.0.1:2001`

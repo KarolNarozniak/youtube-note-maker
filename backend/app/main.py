@@ -26,7 +26,10 @@ app = FastAPI(title=APP_NAME, version="0.1.0", lifespan=lifespan)
 frontend_origins = {
     f"http://{settings.frontend_host}:{settings.frontend_port}",
     f"http://localhost:{settings.frontend_port}",
+    f"http://127.0.0.1:{settings.frontend_port}",
+    *settings.allowed_origins,
 }
+frontend_origins.discard(f"http://0.0.0.0:{settings.frontend_port}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(frontend_origins),

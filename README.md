@@ -71,6 +71,21 @@ Or start the app stack quickly:
 bash scripts/start-all.sh
 ```
 
+## Share On Your Local Network
+
+On Ubuntu, keep Thothscribe bound to the VM and expose it through Nginx on port 80:
+
+```bash
+bash scripts/start-all.sh
+sudo bash scripts/expose-lan-ubuntu.sh 10.7.183.67
+```
+
+Then open:
+
+```text
+http://10.7.183.67/
+```
+
 Open:
 
 ```text

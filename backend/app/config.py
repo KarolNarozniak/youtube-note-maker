@@ -39,6 +39,12 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_list(name: str) -> tuple[str, ...]:
+    """Read a comma-separated environment variable into a tuple. Input is the variable name; output is trimmed non-empty values."""
+    raw_value = os.environ.get(name, "")
+    return tuple(item.strip() for item in raw_value.split(",") if item.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     repo_root: Path
@@ -48,6 +54,7 @@ class Settings:
     frontend_port: int
     docs_host: str
     docs_port: int
+    allowed_origins: tuple[str, ...]
     data_dir: Path
     db_path: Path
     audio_dir: Path
@@ -89,6 +96,7 @@ def get_settings() -> Settings:
         frontend_port=_env_int("FRONTEND_PORT", 2001),
         docs_host=_env("DOCS_HOST", "127.0.0.1"),
         docs_port=_env_int("DOCS_PORT", 2003),
+        allowed_origins=_env_list("ALLOWED_ORIGINS"),
         data_dir=data_dir,
         db_path=data_dir / "app.db",
         audio_dir=data_dir / "audio",

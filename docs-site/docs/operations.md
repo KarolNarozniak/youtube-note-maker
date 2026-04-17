@@ -34,6 +34,14 @@ If Qdrant is unavailable, run:
 .\scripts\start-qdrant.ps1
 ```
 
+On Ubuntu, if the LAN page does not load from another machine, verify that Nginx is running and port 80 is open:
+
+```bash
+systemctl status nginx
+sudo nginx -t
+sudo ufw allow 80/tcp
+```
+
 If the downloader cannot start, rebuild the sidecar:
 
 ```powershell

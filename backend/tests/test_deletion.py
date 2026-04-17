@@ -11,6 +11,7 @@ def make_settings(tmp_path):
         frontend_port=2001,
         docs_host="127.0.0.1",
         docs_port=2003,
+        allowed_origins=(),
         data_dir=tmp_path / "data",
         db_path=tmp_path / "data" / "app.db",
         audio_dir=tmp_path / "data" / "audio",
