@@ -77,6 +77,8 @@ Open:
 http://10.7.183.67/
 ```
 
+For hosting multiple apps on one VM, use the subdomain deployment in [Multi-App VM](./vm-deployment.md).
+
 Use these local URLs:
 
 - App: `http://127.0.0.1:2001`

@@ -86,6 +86,36 @@ Then open:
 http://10.7.183.67/
 ```
 
+## Multi-App VM Deployment
+
+For a single strong VM hosting multiple apps, use the subdomain deployment scripts:
+
+```bash
+cd ~
+git clone https://github.com/KarolNarozniak/youtube-note-maker.git
+git clone https://github.com/KarolNarozniak/Top_young_podpisy.git
+
+cd ~/youtube-note-maker
+git pull
+bash scripts/install-prereqs-ubuntu.sh
+sudo bash scripts/vm/deploy-all.sh 10.7.183.67 kzc.wat
+```
+
+Add this to each client hosts file:
+
+```text
+10.7.183.67 notes.kzc.wat docs.notes.kzc.wat podpisy.kzc.wat docs.podpisy.kzc.wat
+```
+
+Install `~/kzc-local-ca.crt` on client devices, then open:
+
+```text
+https://notes.kzc.wat
+https://docs.notes.kzc.wat
+https://podpisy.kzc.wat
+https://docs.podpisy.kzc.wat
+```
+
 Open:
 
 ```text

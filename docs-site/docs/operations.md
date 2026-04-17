@@ -34,12 +34,22 @@ If Qdrant is unavailable, run:
 .\scripts\start-qdrant.ps1
 ```
 
+For the multi-app VM deployment, backend services are managed by systemd:
+
+```bash
+systemctl status thothscribe-backend
+systemctl status podpisy-backend
+journalctl -u thothscribe-backend -f
+journalctl -u podpisy-backend -f
+```
+
 On Ubuntu, if the LAN page does not load from another machine, verify that Nginx is running and port 80 is open:
 
 ```bash
 systemctl status nginx
 sudo nginx -t
 sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
 ```
 
 If the downloader cannot start, rebuild the sidecar:

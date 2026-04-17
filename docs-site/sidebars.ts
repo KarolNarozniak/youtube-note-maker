@@ -10,6 +10,7 @@ const sidebars: SidebarsConfig = {
     "api",
     "operations",
     "development",
+    "vm-deployment",
   ],
 };
 
