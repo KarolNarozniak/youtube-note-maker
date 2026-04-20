@@ -359,6 +359,7 @@ class IngestionPipeline:
 
     def _write_chunks_file(self, video_id: str, chunks: list[TranscriptChunk]) -> None:
         path = self.settings.chunks_dir / f"{video_id}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps([chunk.__dict__ for chunk in chunks], ensure_ascii=False, indent=2),
             encoding="utf-8",
